@@ -270,7 +270,7 @@ func (s *Scheduler) evaluateIncident(ctx context.Context, m Monitor, r checkResu
 		} else {
 			log.Printf("monitor %s: DOWN — incident opened", m.ID)
 		}
-		s.sendAlert(m, false, r.ErrorMessage)
+		go s.sendAlert(m, false, r.ErrorMessage)
 
 	case !wasUp && r.IsUp:
 		// Transition: down → up. Close the open incident.
@@ -285,7 +285,7 @@ func (s *Scheduler) evaluateIncident(ctx context.Context, m Monitor, r checkResu
 		} else {
 			log.Printf("monitor %s: UP — incident closed", m.ID)
 		}
-		s.sendAlert(m, true, "")
+		go s.sendAlert(m, true, "")
 	}
 }
 

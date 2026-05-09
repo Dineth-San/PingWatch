@@ -54,7 +54,7 @@ func (s *Store) GetMonitor(ctx context.Context, id, userID string) (*Monitor, er
 	m := &Monitor{}
 	err := s.db.QueryRow(ctx,
 		`SELECT id, user_id, name, url, interval_seconds, is_active, created_at
-		 FROM monitors WHERE id = $1 AND user_id = $2`,
+		 FROM monitors WHERE id = $1 AND user_id = $2 AND is_active = true`,
 		id, userID,
 	).Scan(&m.ID, &m.UserID, &m.Name, &m.URL, &m.IntervalSeconds, &m.IsActive, &m.CreatedAt)
 	if err != nil {

@@ -3,7 +3,7 @@ import { useState } from "react";
 import useSWR, { mutate as globalMutate } from "swr";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api, Check, Incident } from "@/lib/api";
+import { api, Incident } from "@/lib/api";
 import {
   ResponsiveContainer,
   LineChart,
@@ -42,7 +42,7 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
   async function handleDelete() {
     if (!confirm(`Delete "${monitor?.Name}"? This cannot be undone.`)) return;
     await api.deleteMonitor(id);
-    await globalMutate("monitors", undefined, { revalidate: false });
+    await globalMutate("monitors");
     router.push("/dashboard");
   }
 
@@ -204,9 +204,9 @@ export default function MonitorDetailPage({ params }: { params: { id: string } }
                   stroke="var(--primary)"
                   strokeWidth={2}
                   connectNulls
-                  dot={(props: {cx: number; cy: number; payload: {isUp: boolean; ms: number}}) => {
-                    const { cx, cy, payload } = props;
-                    const down = payload.isUp === false;
+                  dot={(props: {cx?: number; cy?: number; payload?: {isUp: boolean; ms: number}}) => {
+                    const { cx = 0, cy = 0, payload } = props;
+                    const down = payload?.isUp === false;
                     return (
                       <circle
                         key={`dot-${cx}-${cy}`}

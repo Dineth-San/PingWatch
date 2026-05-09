@@ -10,6 +10,11 @@ services:
       POSTGRES_PASSWORD: watch
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ping -d pingwatch"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   api:
     build:
@@ -23,7 +28,15 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "8025:8025"   # web UI — open http://localhost:8025 to read caught emails
+      - "1025:1025"   # SMTP port the worker connects to
 
   worker:
     build:
@@ -32,8 +45,16 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgres://ping:watch@postgres:5432/pingwatch?sslmode=disable
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-alerts@pingwatch.local}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
 
   frontend:
     build:
@@ -45,7 +66,8 @@ services:
     ports:
       - "3000:3000"
     depends_on:
-      - api
+      api:
+        condition: service_started
 
 volumes:
   pgdata:

@@ -2,12 +2,14 @@ package scheduler
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/kaludineth/pingwatch/worker/internal/mailer"
 )
 
 const refreshInterval = 60 * time.Second
@@ -15,7 +17,9 @@ const refreshInterval = 60 * time.Second
 // Monitor holds the fields the scheduler needs for each active monitor.
 type Monitor struct {
 	ID              string
+	Name            string
 	URL             string
+	UserEmail       string
 	IntervalSeconds int
 }
 
@@ -36,15 +40,17 @@ type runningEntry struct {
 
 // Scheduler manages the set of running monitor goroutines.
 type Scheduler struct {
-	db    *pgxpool.Pool
-	state sync.Map   // map[monitorID]bool — last known is_up per monitor
-	mu    sync.Mutex // protects running
+	db      *pgxpool.Pool
+	mailer  *mailer.Mailer // nil disables email alerts
+	state   sync.Map       // map[monitorID]bool — last known is_up per monitor
+	mu      sync.Mutex     // protects running
 	running map[string]runningEntry
 }
 
-func New(db *pgxpool.Pool) *Scheduler {
+func New(db *pgxpool.Pool, m *mailer.Mailer) *Scheduler {
 	return &Scheduler{
 		db:      db,
+		mailer:  m,
 		running: make(map[string]runningEntry),
 	}
 }
@@ -142,10 +148,13 @@ func (s *Scheduler) startLocked(ctx context.Context, m Monitor) {
 	log.Printf("monitor %s: started (interval %ds, url %s)", m.ID, m.IntervalSeconds, m.URL)
 }
 
-// loadActiveMonitors queries all monitors with is_active=true.
+// loadActiveMonitors queries all monitors with is_active=true, joining users for alert emails.
 func loadActiveMonitors(ctx context.Context, db *pgxpool.Pool) ([]Monitor, error) {
 	rows, err := db.Query(ctx,
-		`SELECT id, url, interval_seconds FROM monitors WHERE is_active = true`,
+		`SELECT m.id, m.name, m.url, m.interval_seconds, u.email
+		 FROM monitors m
+		 JOIN users u ON u.id = m.user_id
+		 WHERE m.is_active = true`,
 	)
 	if err != nil {
 		return nil, err
@@ -155,7 +164,7 @@ func loadActiveMonitors(ctx context.Context, db *pgxpool.Pool) ([]Monitor, error
 	var monitors []Monitor
 	for rows.Next() {
 		var m Monitor
-		if err := rows.Scan(&m.ID, &m.URL, &m.IntervalSeconds); err != nil {
+		if err := rows.Scan(&m.ID, &m.Name, &m.URL, &m.IntervalSeconds, &m.UserEmail); err != nil {
 			return nil, err
 		}
 		monitors = append(monitors, m)
@@ -261,6 +270,7 @@ func (s *Scheduler) evaluateIncident(ctx context.Context, m Monitor, r checkResu
 		} else {
 			log.Printf("monitor %s: DOWN — incident opened", m.ID)
 		}
+		s.sendAlert(m, false, r.ErrorMessage)
 
 	case !wasUp && r.IsUp:
 		// Transition: down → up. Close the open incident.
@@ -275,5 +285,31 @@ func (s *Scheduler) evaluateIncident(ctx context.Context, m Monitor, r checkResu
 		} else {
 			log.Printf("monitor %s: UP — incident closed", m.ID)
 		}
+		s.sendAlert(m, true, "")
+	}
+}
+
+// sendAlert emails the monitor owner about a down/up transition.
+// It is a no-op when s.mailer is nil or the monitor has no email.
+func (s *Scheduler) sendAlert(m Monitor, isUp bool, errMsg string) {
+	if s.mailer == nil || m.UserEmail == "" {
+		return
+	}
+
+	var subject, body string
+	if !isUp {
+		reason := errMsg
+		if reason == "" {
+			reason = "non-2xx response"
+		}
+		subject = fmt.Sprintf("[PingWatch] DOWN: %s", m.Name)
+		body = fmt.Sprintf("Your monitor \"%s\" (%s) is DOWN.\n\nReason: %s", m.Name, m.URL, reason)
+	} else {
+		subject = fmt.Sprintf("[PingWatch] UP: %s", m.Name)
+		body = fmt.Sprintf("Your monitor \"%s\" (%s) is back UP.", m.Name, m.URL)
+	}
+
+	if err := s.mailer.Send(m.UserEmail, subject, body); err != nil {
+		log.Printf("monitor %s: send alert to %s: %v", m.ID, m.UserEmail, err)
 	}
 }

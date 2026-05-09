@@ -180,7 +180,7 @@ func (s *Store) ListMonitorSummaries(ctx context.Context, userID string) ([]Moni
 			ORDER BY checked_at DESC
 			LIMIT 1
 		) c ON true
-		WHERE m.user_id = $1
+		WHERE m.user_id = $1 AND m.is_active = true
 		ORDER BY m.created_at DESC`,
 		userID,
 	)

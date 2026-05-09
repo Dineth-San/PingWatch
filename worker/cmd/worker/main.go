@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/kaludineth/pingwatch/worker/internal/mailer"
 	"github.com/kaludineth/pingwatch/worker/internal/scheduler"
 )
 
@@ -26,7 +27,22 @@ func main() {
 	}
 	defer pool.Close()
 
-	s := scheduler.New(pool)
+	var m *mailer.Mailer
+	smtpHost := os.Getenv("SMTP_HOST")
+	if smtpHost != "" {
+		m = mailer.New(
+			smtpHost,
+			os.Getenv("SMTP_PORT"),
+			os.Getenv("SMTP_USER"),
+			os.Getenv("SMTP_PASS"),
+			os.Getenv("SMTP_FROM"),
+		)
+		log.Printf("SMTP alerts enabled via %s", smtpHost)
+	} else {
+		log.Println("SMTP_HOST not set — email alerts disabled")
+	}
+
+	s := scheduler.New(pool, m)
 	if err := s.Start(ctx); err != nil {
 		log.Fatalf("scheduler start: %v", err)
 	}

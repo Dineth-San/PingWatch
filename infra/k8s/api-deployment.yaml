@@ -30,7 +30,7 @@ spec:
                   name: pingwatch-secrets
                   key: JWT_SECRET
             - name: FRONTEND_URL
-              value: "http://FRONTEND_LB_URL"  # replace after first deploy
+              value: "http://a9ee92f90201d470d870397c05103793-1739177248.ap-south-1.elb.amazonaws.com"
           resources:
             requests:
               cpu: 100m

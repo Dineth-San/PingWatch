@@ -96,9 +96,7 @@ jobs:
       - name: Build and push
         run: |
           IMAGE=${{ secrets.ECR_REGISTRY }}/pingwatch-frontend:${{ github.sha }}
-          docker build \
-            --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} \
-            -t $IMAGE frontend/
+          docker build -t $IMAGE frontend/
           docker push $IMAGE
 
   deploy:

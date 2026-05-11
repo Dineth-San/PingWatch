@@ -18,9 +18,9 @@ spec:
           image: IMAGE_TAG_FRONTEND
           ports:
             - containerPort: 3000
-          # NEXT_PUBLIC_API_URL is baked into the image at build time — see build-frontend
-          # in .github/workflows/deploy.yml. Set it as a GitHub secret named NEXT_PUBLIC_API_URL
-          # pointing to the API LoadBalancer URL (get it after first deploy: kubectl get svc api -n pingwatch).
+          env:
+            - name: API_URL
+              value: "http://api"
           resources:
             requests:
               cpu: 100m

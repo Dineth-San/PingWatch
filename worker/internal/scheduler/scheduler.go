@@ -36,6 +36,7 @@ type checkResult struct {
 type runningEntry struct {
 	cancel          context.CancelFunc
 	intervalSeconds int
+	url             string
 }
 
 // Scheduler manages the set of running monitor goroutines.
@@ -120,11 +121,11 @@ func (s *Scheduler) reconcile(ctx context.Context) {
 			delete(s.running, id)
 			s.state.Delete(id) // reset so a future re-activation starts fresh
 			log.Printf("monitor %s: deactivated — goroutine stopped", id)
-		} else if m.IntervalSeconds != e.intervalSeconds {
+		} else if m.IntervalSeconds != e.intervalSeconds || m.URL != e.url {
 			e.cancel()
 			delete(s.running, id)
 			s.state.Delete(id) // reset so the new goroutine starts from unknown state
-			log.Printf("monitor %s: interval changed to %ds — restarting", id, m.IntervalSeconds)
+			log.Printf("monitor %s: config changed (interval=%ds url=%s) — restarting", id, m.IntervalSeconds, m.URL)
 		}
 	}
 
@@ -143,6 +144,7 @@ func (s *Scheduler) startLocked(ctx context.Context, m Monitor) {
 	s.running[m.ID] = runningEntry{
 		cancel:          cancel,
 		intervalSeconds: m.IntervalSeconds,
+		url:             m.URL,
 	}
 	go s.runMonitor(mCtx, m)
 	log.Printf("monitor %s: started (interval %ds, url %s)", m.ID, m.IntervalSeconds, m.URL)

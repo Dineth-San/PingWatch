@@ -14,5 +14,8 @@ frontend/.next/
 # Docker
 *.log
 
+# Kubernetes secrets (contain real credentials — never commit)
+infra/k8s/secret.yaml
+
 # Claude Code
 .claude/

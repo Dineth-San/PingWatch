@@ -19,7 +19,11 @@ export default function DashboardPage() {
 
   if (error?.message?.includes("unauthorized")) {
     router.push("/login");
-    return null;
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+        <p style={{ color: "var(--muted)" }}>Redirecting…</p>
+      </div>
+    );
   }
 
   // Sort: down first, then pending, then up

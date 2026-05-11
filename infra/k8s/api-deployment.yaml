@@ -55,7 +55,7 @@ metadata:
   name: api
   namespace: pingwatch
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: api
   ports:
